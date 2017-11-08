@@ -37,7 +37,6 @@ func main() {
   updated := false
 
   updateTemplate := func() {
-
     f, _ := os.OpenFile(*outPath, os.O_CREATE|os.O_WRONLY, 0777)
     defer f.Close()
 
@@ -57,8 +56,7 @@ func main() {
   }
 
   watchlist := cache.NewListWatchFromClient(clientset.Core().RESTClient(),
-    "services", apiv1.NamespaceDefault,
-    fields.Everything())
+    "services", apiv1.NamespaceDefault, fields.Everything())
 
   _, controller := cache.NewInformer(
     watchlist,
