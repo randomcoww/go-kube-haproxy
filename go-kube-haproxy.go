@@ -37,7 +37,7 @@ func main() {
   updated := false
 
   updateTemplate := func() {
-    f, _ := os.OpenFile(*outPath, os.O_CREATE|os.O_WRONLY, 0777)
+    f, _ := os.OpenFile(*outPath, os.O_CREATE|os.O_WRONLY, 0644)
     defer f.Close()
 
     tmpl, _ = tmpl.ParseFiles(*templatePath)
