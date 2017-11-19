@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-echo -en "$CONFIG" > /go_template
+echo -en "$CONFIG" > /template
 
 ## start
-exec /go-kube-haproxy "$@" -template /go_template
+exec /go-kube-haproxy "$@" -template /template
