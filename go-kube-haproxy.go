@@ -26,7 +26,25 @@ var (
   kubeconfigPath = flag.String("kubeconfig", "", "kubeconfig file path")
   templatePath = flag.String("template", "", "go template file path")
   outPath = flag.String("output", "", "output file path")
+  // socketPath = flag.String("socket", "", "haproxy socket")
 )
+
+
+// func haproxyCommand(cmd string, result *bytes.Buffer) {
+//   c, err := net.Dial("unix", *socketPath)
+//   defer c.Close()
+//
+//   if err != nil {
+//     panic(err.Error())
+//   }
+//
+//   _, err = c.Write([]byte(cmd + "\n"))
+//   if err != nil {
+//     panic(err.Error())
+//   }
+//
+//   io.Copy(result, c)
+// }
 
 
 func main() {
@@ -35,6 +53,7 @@ func main() {
   servicesMap := make(map[Key]PortMap)
   tmpl := template.New("template")
   updated := false
+  // haproxyStat := bytes.NewBuffer(nil)
 
   updateTemplate := func() {
     f, _ := os.OpenFile(*outPath, os.O_CREATE|os.O_WRONLY, 0644)
