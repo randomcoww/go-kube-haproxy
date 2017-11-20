@@ -1,9 +1,0 @@
-{{range $index, $element := .}}{{if $element.NodePort}}
-frontend {{$index.ServiceName}}_{{$index.PortName}}
-  default_backend {{$index.ServiceName}}_{{$index.PortName}}
-  bind {{$element.Port}}
-  maxconn 2000
-
-backend {{$index.ServiceName}}_{{$index.PortName}}
-  server coreos-kube-master coreos-kube-master.hl.lan:{{$element.NodePort}} init-addr libc,none resolvers default
-{{end}}{{end}}

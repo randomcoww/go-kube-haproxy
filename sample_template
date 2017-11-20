@@ -1,0 +1,36 @@
+global
+  log 127.0.0.1 local0
+  log-tag haproxy
+  daemon
+  quiet
+  stats socket /var/run/haproxy.sock
+  stats timeout 2m
+  maxconn 1024
+  pidfile /var/run/haproxy.pid
+resolvers default
+  nameserver coreos-gateway1 192.168.62.217:53
+  nameserver coreos-gateway2 192.168.62.218:53
+  resolve_retries 3
+defaults
+  timeout connect 5000ms
+  timeout client 10000ms
+  timeout server 10000ms
+  log global
+  mode tcp
+  balance roundrobin
+  option dontlognull
+  option redispatch
+frontend kube-master
+  default_backend kube-master
+  bind *:24443
+  maxconn 2000
+backend kube-master
+  server coreos-kube-master coreos-kube-master.hl.lan:20443 init-addr libc,none resolvers default
+{{range $index, $element := .}}{{if $element.NodePort}}
+frontend {{$index.ServiceName}}_{{$index.PortName}}
+  default_backend {{$index.ServiceName}}_{{$index.PortName}}
+  bind {{$element.Port}}
+  maxconn 2000
+backend {{$index.ServiceName}}_{{$index.PortName}}
+  server coreos-kube-master coreos-kube-master.hl.lan:{{$element.NodePort}} init-addr libc,none resolvers default
+{{end}}{{end}}

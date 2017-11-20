@@ -6,6 +6,7 @@ import (
   "time"
   "text/template"
   "os"
+  "os/exec"
 
   apiv1 "k8s.io/api/core/v1"
   "k8s.io/client-go/kubernetes"
@@ -26,6 +27,7 @@ var (
   kubeconfigPath = flag.String("kubeconfig", "", "kubeconfig file path")
   templatePath = flag.String("template", "", "go template file path")
   outPath = flag.String("output", "", "output file path")
+  reloadCmd = flag.String("reloadcmd", "", "haproxy reload command")
   // socketPath = flag.String("socket", "", "haproxy socket")
 )
 
@@ -61,6 +63,9 @@ func main() {
 
     tmpl, _ = tmpl.ParseFiles(*templatePath)
     tmpl.Execute(f, servicesMap)
+
+    exec.Command(*reloadCmd).Output()
+    fmt.Printf("Reload HAProxy\n")
   }
 
 
@@ -131,7 +136,6 @@ func main() {
     if (updated) {
       updated = false
 
-      fmt.Printf("Update template\n")
       updateTemplate()
     }
   }
