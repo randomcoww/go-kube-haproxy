@@ -64,8 +64,10 @@ func main() {
     tmpl, _ = tmpl.ParseFiles(*templatePath)
     tmpl.Execute(f, servicesMap)
 
-    exec.Command(*reloadCmd).Output()
-    fmt.Printf("Reload HAProxy\n")
+    fmt.Printf("Call " + *reloadCmd + "\n")
+
+    out, _ := exec.Command(*reloadCmd).Output()
+    fmt.Printf(string(out) + "\n")
   }
 
 
