@@ -3,6 +3,6 @@
 
 ## start
 rm -f $HAPROXY_PID_PATH
-exec haproxy "$@" -db -V \
+exec haproxy "$@" -V \
   -f $HAPROXY_CONFIG_PATH \
 	-p $HAPROXY_PID_PATH
