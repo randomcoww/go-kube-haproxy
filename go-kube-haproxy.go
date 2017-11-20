@@ -28,7 +28,6 @@ var (
   templatePath = flag.String("template", "", "go template file path")
   outPath = flag.String("output", "", "output file path")
   reloadCmd = flag.String("reloadcmd", "", "haproxy reload command")
-  // socketPath = flag.String("socket", "", "haproxy socket")
 )
 
 
@@ -63,13 +62,12 @@ func main() {
 
     tmpl, _ = tmpl.ParseFiles(*templatePath)
     tmpl.Execute(f, servicesMap)
-
-    fmt.Printf("Call " + *reloadCmd + "\n")
-
-    out, _ := exec.Command(*reloadCmd).Output()
-    fmt.Printf(string(out) + "\n")
   }
 
+  callReload := func() {
+    err := exec.Command("/bin/sh", "-c", *reloadCmd).Run()
+    fmt.Println(err)
+  }
 
   config, err := clientcmd.BuildConfigFromFlags("", *kubeconfigPath)
   if err != nil {
@@ -139,6 +137,7 @@ func main() {
       updated = false
 
       updateTemplate()
+      callReload()
     }
   }
 }
