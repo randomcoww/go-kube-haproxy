@@ -6,7 +6,6 @@ global
   stats socket /var/run/haproxy.sock
   stats timeout 2m
   maxconn 1024
-  pidfile /var/run/haproxy.pid
 resolvers default
   nameserver coreos-gateway1 192.168.62.217:53
   nameserver coreos-gateway2 192.168.62.218:53
@@ -29,7 +28,7 @@ backend kube-master
 {{range $index, $element := .}}{{if $element.NodePort}}
 frontend {{$index.ServiceName}}_{{$index.PortName}}
   default_backend {{$index.ServiceName}}_{{$index.PortName}}
-  bind {{$element.Port}}
+  bind *:{{$element.Port}}
   maxconn 2000
 backend {{$index.ServiceName}}_{{$index.PortName}}
   server coreos-kube-master coreos-kube-master.hl.lan:{{$element.NodePort}} init-addr libc,none resolvers default
