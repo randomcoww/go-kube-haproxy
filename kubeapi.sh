@@ -5,4 +5,4 @@ echo -en "$CONFIG" > /template
 exec /go-kube-haproxy "$@" \
   -template /template \
   -output $HAPROXY_CONFIG_PATH
-  -reloadcmd "kill -s HUP $(pidof haproxy-systemd-wrapper)"
+  -reloadcmd "kill -s HUP $(pidof /usr/local/sbin/haproxy-systemd-wrapper)"
