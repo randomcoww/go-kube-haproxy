@@ -7,6 +7,8 @@ import (
   "text/template"
   "os"
   "os/exec"
+  "strconv"
+  "syscall"
 
   apiv1 "k8s.io/api/core/v1"
   "k8s.io/client-go/kubernetes"
@@ -27,7 +29,7 @@ var (
   kubeconfigPath = flag.String("kubeconfig", "", "kubeconfig file path")
   templatePath = flag.String("template", "", "go template file path")
   outPath = flag.String("output", "", "output file path")
-  reloadCmd = flag.String("reloadcmd", "", "haproxy reload command")
+  // reloadCmd = flag.String("reloadcmd", "", "haproxy reload command")
 )
 
 
@@ -65,8 +67,13 @@ func main() {
   }
 
   callReload := func() {
-    err := exec.Command("/bin/sh", "-c", *reloadCmd).Run()
-    fmt.Println(err)
+    out, err := exec.Command("pidof", "haproxy-systemd-wrapper").Output()
+
+    if (err == nil) {
+      pid, _ := strconv.ParseInt(string(out[0:len(out) - 1]), 10, 32)
+      syscall.Kill(int(pid), syscall.SIGUSR2)
+      fmt.Println("reload")
+    }
   }
 
   config, err := clientcmd.BuildConfigFromFlags("", *kubeconfigPath)
