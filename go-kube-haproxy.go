@@ -6,9 +6,11 @@ import (
   "time"
   "text/template"
   "os"
-  "os/exec"
+  // "os/exec"
   "strconv"
   "syscall"
+  "io/ioutil"
+  "bytes"
 
   apiv1 "k8s.io/api/core/v1"
   "k8s.io/client-go/kubernetes"
@@ -26,10 +28,10 @@ type PortMap struct {
 }
 
 var (
-  kubeconfigPath = flag.String("kubeconfig", "", "kubeconfig file path")
-  templatePath = flag.String("template", "", "go template file path")
-  outPath = flag.String("output", "", "output file path")
-  // reloadCmd = flag.String("reloadcmd", "", "haproxy reload command")
+  kubeconfigFile = flag.String("kubeconfig", "", "kubeconfig file path")
+  templateFile = flag.String("template", "", "go template file path")
+  outFile = flag.String("output", "", "output file path")
+  pidFile = flag.String("pid", "", "pid file path")
 )
 
 
@@ -56,27 +58,33 @@ func main() {
   servicesMap := make(map[Key]PortMap)
   tmpl := template.New("template")
   updated := false
-  // haproxyStat := bytes.NewBuffer(nil)
+
 
   updateTemplate := func() {
-    f, _ := os.OpenFile(*outPath, os.O_CREATE|os.O_WRONLY, 0644)
+    f, _ := os.OpenFile(*outFile, os.O_CREATE|os.O_WRONLY, 0644)
     defer f.Close()
 
-    tmpl, _ = tmpl.ParseFiles(*templatePath)
+    tmpl, _ = tmpl.ParseFiles(*templateFile)
     tmpl.Execute(f, servicesMap)
+    fmt.Println("Update template")
   }
 
-  callReload := func() {
-    out, err := exec.Command("pidof", "haproxy-systemd-wrapper").Output()
 
-    if (err == nil) {
-      pid, _ := strconv.ParseInt(string(out[0:len(out) - 1]), 10, 32)
-      syscall.Kill(int(pid), syscall.SIGUSR2)
-      fmt.Println("reload")
+  callReload := func() {
+    pid, err := ioutil.ReadFile(*pidFile)
+
+    if err == nil {
+      pid, err := strconv.Atoi(string(bytes.TrimSpace(pid)))
+
+      if err == nil {
+        syscall.Kill(pid, syscall.SIGUSR2)
+        fmt.Println("Send kill %d", pid)
+      }
     }
   }
 
-  config, err := clientcmd.BuildConfigFromFlags("", *kubeconfigPath)
+
+  config, err := clientcmd.BuildConfigFromFlags("", *kubeconfigFile)
   if err != nil {
     panic(err.Error())
   }
