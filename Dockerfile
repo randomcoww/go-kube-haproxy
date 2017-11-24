@@ -1,4 +1,4 @@
-FROM haproxy:1.7
+FROM haproxy:rc
 
 ENV HAPROXY_CONFIG_PATH /etc/haproxy/haproxy.cfg
 
