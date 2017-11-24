@@ -1,4 +1,5 @@
-FROM haproxy:rc
+FROM debian:sid
 
 COPY go-kube-haproxy /
-COPY kubeapi.sh /
+COPY entrypoint.sh /
+ENTRYPOINT ["/entrypoint.sh"]
