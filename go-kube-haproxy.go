@@ -78,7 +78,7 @@ func main() {
 
       if err == nil {
         syscall.Kill(pid, syscall.SIGUSR2)
-        fmt.Println("Send kill %d", pid)
+        fmt.Println("Send kill", pid)
       }
     }
   }
