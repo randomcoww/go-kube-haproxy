@@ -80,8 +80,9 @@ func main() {
 
 
   updateTemplate := func() {
-    f, _ := os.OpenFile(*outFile, os.O_CREATE|os.O_WRONLY, 0644)
+    f, _ := os.OpenFile(*outFile, os.O_CREATE|os.O_RDWR, 0644)
     defer f.Close()
+    f.Truncate(0)
 
     tmpl, _ = tmpl.ParseFiles(*templateFile)
     fmt.Println("Update template", Template{ Services: servicesMap, Nodes: nodesMap })
@@ -121,6 +122,27 @@ func main() {
   nodeWatchlist := cache.NewListWatchFromClient(clientset.Core().RESTClient(),
     "nodes", apiv1.NamespaceAll, fields.Everything())
 
+
+  deleteNode := func(node *apiv1.Node) {
+    _, exists := nodesMap[NodeKey{node.Name}]
+
+    if exists {
+      delete(nodesMap, NodeKey{node.Name})
+      fmt.Printf("Delete node: %s\n", node.Name)
+      updated = true
+    }
+  }
+
+  updateNode := func(node *apiv1.Node, address *apiv1.NodeAddress) {
+    if (nodesMap[NodeKey{node.Name}] != IPMap{address.Address}) {
+
+      nodesMap[NodeKey{node.Name}] = IPMap{address.Address}
+      fmt.Printf("Update node: %s->%s\n", node.Name, address.Address)
+      updated = true
+    }
+  }
+
+
   _, nodeController := cache.NewInformer(
     nodeWatchlist,
     &apiv1.Node{},
@@ -129,41 +151,49 @@ func main() {
 
       AddFunc: func(obj interface{}) {
         node := obj.(*apiv1.Node)
-        if node.Spec.Unschedulable {
-					return
+
+        for _, condition := range node.Status.Conditions {
+          if (condition.Type == "Ready") {
+            if (condition.Status != apiv1.ConditionTrue) {
+
+              deleteNode(node)
+              return
+            }
+          }
         }
 
         for _, address := range node.Status.Addresses {
           if (address.Type == "InternalIP") {
 
-            nodesMap[NodeKey{node.Name}] = IPMap{address.Address}
-            fmt.Printf("Add node: %s->%s\n", node.Name, address.Address)
-            updated = true
+            updateNode(node, &address)
+            return
           }
         }
       },
 
       DeleteFunc: func(obj interface{}) {
         node := obj.(*apiv1.Node)
-
-        delete(nodesMap, NodeKey{node.Name})
-        fmt.Printf("Delete node: %s\n", node.Name)
-        updated = true
+        deleteNode(node)
       },
 
       UpdateFunc: func(_, obj interface{}) {
         node := obj.(*apiv1.Node)
-        if node.Spec.Unschedulable {
-					return
+
+        for _, condition := range node.Status.Conditions {
+          if (condition.Type == "Ready") {
+            if (condition.Status != apiv1.ConditionTrue) {
+
+              deleteNode(node)
+              return
+            }
+          }
         }
 
         for _, address := range node.Status.Addresses {
-          if (address.Type == "InternalIP" &&
-            nodesMap[NodeKey{node.Name}] != IPMap{address.Address}) {
+          if (address.Type == "InternalIP") {
 
-            nodesMap[NodeKey{node.Name}] = IPMap{address.Address}
-            fmt.Printf("Update node: %s->%s\n", node.Name, address.Address)
-            updated = true
+            updateNode(node, &address)
+            return
           }
         }
       },
