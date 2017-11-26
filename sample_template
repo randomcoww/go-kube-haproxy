@@ -19,17 +19,18 @@ defaults
   balance roundrobin
   option dontlognull
   option redispatch
-frontend kube-master
-  default_backend kube-master
-  bind *:24443
+{{range $service, $ports := $.Services}}{{if $ports.NodePort}}frontend {{$service.ServiceName}}_{{$service.PortName}}
+  default_backend {{$service.ServiceName}}_{{$service.PortName}}
+  bind *:{{$ports.Port}}
   maxconn 2000
-backend kube-master
-  server coreos-kube-master coreos-kube-master.hl.lan:20443 init-addr libc,none resolvers default
-{{range $index, $element := .}}{{if $element.NodePort}}
-frontend {{$index.ServiceName}}_{{$index.PortName}}
-  default_backend {{$index.ServiceName}}_{{$index.PortName}}
-  bind *:{{$element.Port}}
+backend {{$service.ServiceName}}_{{$service.PortName}}
+  {{range $node, $host := $.Nodes}}server {{$node.NodeName}} {{$host.InternalIP}}:{{$ports.NodePort}}
+  {{end}}
+{{else}}frontend {{$service.ServiceName}}_{{$service.PortName}}
+  default_backend {{$service.ServiceName}}_{{$service.PortName}}
+  bind *:{{$ports.Port}}
   maxconn 2000
-backend {{$index.ServiceName}}_{{$index.PortName}}
-  server coreos-kube-master coreos-kube-master.hl.lan:{{$element.NodePort}} init-addr libc,none resolvers default
+backend {{$service.ServiceName}}_{{$service.PortName}}
+  {{range $node, $host := $.Nodes}}server {{$node.NodeName}} {{$host.InternalIP}}:{{$ports.Port}}
+  {{end}}
 {{end}}{{end}}

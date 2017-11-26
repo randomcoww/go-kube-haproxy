@@ -6,7 +6,6 @@ import (
   "time"
   "text/template"
   "os"
-  // "os/exec"
   "strconv"
   "syscall"
   "io/ioutil"
@@ -19,13 +18,31 @@ import (
   "k8s.io/apimachinery/pkg/fields"
 )
 
-type Key struct {
+// service
+type ServiceKey struct {
   ServiceName, PortName string
 }
 
 type PortMap struct {
   NodePort, Port int32
 }
+
+
+// node
+type NodeKey struct {
+  NodeName string
+}
+
+type IPMap struct {
+  InternalIP string
+}
+
+// template
+type Template struct {
+  Services map[ServiceKey]PortMap
+  Nodes map[NodeKey]IPMap
+}
+
 
 var (
   kubeconfigFile = flag.String("kubeconfig", "", "kubeconfig file path")
@@ -55,7 +72,9 @@ var (
 func main() {
   flag.Parse()
 
-  servicesMap := make(map[Key]PortMap)
+  servicesMap := make(map[ServiceKey]PortMap)
+  nodesMap := make(map[NodeKey]IPMap)
+
   tmpl := template.New("template")
   updated := false
 
@@ -65,8 +84,12 @@ func main() {
     defer f.Close()
 
     tmpl, _ = tmpl.ParseFiles(*templateFile)
-    tmpl.Execute(f, servicesMap)
-    fmt.Println("Update template")
+    fmt.Println("Update template", Template{ Services: servicesMap, Nodes: nodesMap })
+
+    err := tmpl.Execute(f, Template{ Services: servicesMap, Nodes: nodesMap })
+    if err != nil {
+      fmt.Println(err)
+    }
   }
 
 
@@ -94,11 +117,65 @@ func main() {
     panic(err.Error())
   }
 
-  watchlist := cache.NewListWatchFromClient(clientset.Core().RESTClient(),
+
+  nodeWatchlist := cache.NewListWatchFromClient(clientset.Core().RESTClient(),
+    "nodes", apiv1.NamespaceAll, fields.Everything())
+
+  _, nodeController := cache.NewInformer(
+    nodeWatchlist,
+    &apiv1.Node{},
+    time.Second * 0,
+    cache.ResourceEventHandlerFuncs{
+
+      AddFunc: func(obj interface{}) {
+        node := obj.(*apiv1.Node)
+        if node.Spec.Unschedulable {
+					return
+        }
+
+        for _, address := range node.Status.Addresses {
+          if (address.Type == "InternalIP") {
+
+            nodesMap[NodeKey{node.Name}] = IPMap{address.Address}
+            fmt.Printf("Add node: %s->%s\n", node.Name, address.Address)
+            updated = true
+          }
+        }
+      },
+
+      DeleteFunc: func(obj interface{}) {
+        node := obj.(*apiv1.Node)
+
+        delete(nodesMap, NodeKey{node.Name})
+        fmt.Printf("Delete node: %s\n", node.Name)
+        updated = true
+      },
+
+      UpdateFunc: func(_, obj interface{}) {
+        node := obj.(*apiv1.Node)
+        if node.Spec.Unschedulable {
+					return
+        }
+
+        for _, address := range node.Status.Addresses {
+          if (address.Type == "InternalIP" &&
+            nodesMap[NodeKey{node.Name}] != IPMap{address.Address}) {
+
+            nodesMap[NodeKey{node.Name}] = IPMap{address.Address}
+            fmt.Printf("Update node: %s->%s\n", node.Name, address.Address)
+            updated = true
+          }
+        }
+      },
+    },
+  )
+
+
+  serviceWatchlist := cache.NewListWatchFromClient(clientset.Core().RESTClient(),
     "services", apiv1.NamespaceDefault, fields.Everything())
 
-  _, controller := cache.NewInformer(
-    watchlist,
+  _, serviceController := cache.NewInformer(
+    serviceWatchlist,
     &apiv1.Service{},
     time.Second * 0,
     cache.ResourceEventHandlerFuncs{
@@ -107,8 +184,9 @@ func main() {
         service := obj.(*apiv1.Service)
 
         for _, value := range service.Spec.Ports {
-          servicesMap[Key{service.Name, value.Name}] = PortMap{value.NodePort, value.Port}
-          fmt.Printf("Add service port: %s %d->%d\n", service.Name, value.NodePort, value.Port)
+
+          servicesMap[ServiceKey{service.Name, value.Name}] = PortMap{value.NodePort, value.TargetPort.IntVal}
+          fmt.Printf("Add service port: %s %d->%d\n", service.Name, value.NodePort, value.TargetPort.IntVal)
         }
 
         updated = true
@@ -118,7 +196,7 @@ func main() {
         service := obj.(*apiv1.Service)
 
         for _, value := range service.Spec.Ports {
-          delete(servicesMap, Key{service.Name, value.Name})
+          delete(servicesMap, ServiceKey{service.Name, value.Name})
         }
 
         fmt.Printf("Delete service: %s\n", service.Name)
@@ -129,10 +207,10 @@ func main() {
         service := obj.(*apiv1.Service)
 
         for _, value := range service.Spec.Ports {
-          if (servicesMap[Key{service.Name, value.Name}] != PortMap{value.NodePort, value.Port}) {
+          if (servicesMap[ServiceKey{service.Name, value.Name}] != PortMap{value.NodePort, value.TargetPort.IntVal}) {
 
-            servicesMap[Key{service.Name, value.Name}] = PortMap{value.NodePort, value.Port}
-            fmt.Printf("Update service port: %s %d->%d\n", service.Name, value.NodePort, value.Port)
+            servicesMap[ServiceKey{service.Name, value.Name}] = PortMap{value.NodePort, value.TargetPort.IntVal}
+            fmt.Printf("Update service port: %s %d->%d\n", service.Name, value.NodePort, value.TargetPort.IntVal)
 
             updated = true
           }
@@ -143,7 +221,8 @@ func main() {
 
   stop := make(chan struct{})
 
-  go controller.Run(stop)
+  go nodeController.Run(stop)
+  go serviceController.Run(stop)
 
   for {
     time.Sleep(time.Second * 5)
