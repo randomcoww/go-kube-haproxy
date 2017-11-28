@@ -1,4 +1,4 @@
-FROM debian:sid
+FROM alpine:latest
 
 COPY go-kube-haproxy /
 COPY entrypoint.sh /
