@@ -122,7 +122,6 @@ func main() {
   nodeWatchlist := cache.NewListWatchFromClient(clientset.Core().RESTClient(),
     "nodes", apiv1.NamespaceAll, fields.Everything())
 
-
   deleteNode := func(node *apiv1.Node) {
     _, exists := nodesMap[NodeKey{node.Name}]
 
@@ -133,15 +132,28 @@ func main() {
     }
   }
 
-  updateNode := func(node *apiv1.Node, address *apiv1.NodeAddress) {
-    if (nodesMap[NodeKey{node.Name}] != IPMap{address.Address}) {
+  updateNode := func(node *apiv1.Node) {
+    for _, condition := range node.Status.Conditions {
+      if (condition.Type == "Ready") {
+        if (condition.Status != apiv1.ConditionTrue) {
 
-      nodesMap[NodeKey{node.Name}] = IPMap{address.Address}
-      fmt.Printf("Update node: %s->%s\n", node.Name, address.Address)
-      updated = true
+          deleteNode(node)
+          return
+        }
+      }
+    }
+
+    for _, address := range node.Status.Addresses {
+      if (address.Type == "InternalIP") {
+        if (nodesMap[NodeKey{node.Name}] != IPMap{address.Address}) {
+
+          nodesMap[NodeKey{node.Name}] = IPMap{address.Address}
+          fmt.Printf("Update node: %s->%s\n", node.Name, address.Address)
+          updated = true
+        }
+      }
     }
   }
-
 
   _, nodeController := cache.NewInformer(
     nodeWatchlist,
@@ -150,52 +162,15 @@ func main() {
     cache.ResourceEventHandlerFuncs{
 
       AddFunc: func(obj interface{}) {
-        node := obj.(*apiv1.Node)
-
-        for _, condition := range node.Status.Conditions {
-          if (condition.Type == "Ready") {
-            if (condition.Status != apiv1.ConditionTrue) {
-
-              deleteNode(node)
-              return
-            }
-          }
-        }
-
-        for _, address := range node.Status.Addresses {
-          if (address.Type == "InternalIP") {
-
-            updateNode(node, &address)
-            return
-          }
-        }
-      },
-
-      DeleteFunc: func(obj interface{}) {
-        node := obj.(*apiv1.Node)
-        deleteNode(node)
+        updateNode(obj.(*apiv1.Node))
       },
 
       UpdateFunc: func(_, obj interface{}) {
-        node := obj.(*apiv1.Node)
+        updateNode(obj.(*apiv1.Node))
+      },
 
-        for _, condition := range node.Status.Conditions {
-          if (condition.Type == "Ready") {
-            if (condition.Status != apiv1.ConditionTrue) {
-
-              deleteNode(node)
-              return
-            }
-          }
-        }
-
-        for _, address := range node.Status.Addresses {
-          if (address.Type == "InternalIP") {
-
-            updateNode(node, &address)
-            return
-          }
-        }
+      DeleteFunc: func(obj interface{}) {
+        deleteNode(obj.(*apiv1.Node))
       },
     },
   )
@@ -204,6 +179,31 @@ func main() {
   serviceWatchlist := cache.NewListWatchFromClient(clientset.Core().RESTClient(),
     "services", apiv1.NamespaceDefault, fields.Everything())
 
+  deleteService := func(service *apiv1.Service) {
+    for _, value := range service.Spec.Ports {
+      _, exists := servicesMap[ServiceKey{service.Name, value.Name}]
+
+      if exists {
+        delete(servicesMap, ServiceKey{service.Name, value.Name})
+        fmt.Printf("Delete service: %s\n", service.Name)
+        updated = true
+      }
+    }
+  }
+
+  updateService := func(service *apiv1.Service) {
+    for _, value := range service.Spec.Ports {
+      if value.Protocol == "TCP" {
+        if (servicesMap[ServiceKey{service.Name, value.Name}] != PortMap{value.NodePort, value.TargetPort.IntVal}) {
+
+          servicesMap[ServiceKey{service.Name, value.Name}] = PortMap{value.NodePort, value.TargetPort.IntVal}
+          fmt.Printf("Update service port: %s %d->%d\n", service.Name, value.NodePort, value.TargetPort.IntVal)
+          updated = true
+        }
+      }
+    }
+  }
+
   _, serviceController := cache.NewInformer(
     serviceWatchlist,
     &apiv1.Service{},
@@ -211,43 +211,19 @@ func main() {
     cache.ResourceEventHandlerFuncs{
 
       AddFunc: func(obj interface{}) {
-        service := obj.(*apiv1.Service)
-
-        for _, value := range service.Spec.Ports {
-
-          servicesMap[ServiceKey{service.Name, value.Name}] = PortMap{value.NodePort, value.TargetPort.IntVal}
-          fmt.Printf("Add service port: %s %d->%d\n", service.Name, value.NodePort, value.TargetPort.IntVal)
-        }
-
-        updated = true
-      },
-
-      DeleteFunc: func(obj interface{}) {
-        service := obj.(*apiv1.Service)
-
-        for _, value := range service.Spec.Ports {
-          delete(servicesMap, ServiceKey{service.Name, value.Name})
-        }
-
-        fmt.Printf("Delete service: %s\n", service.Name)
-        updated = true
+        updateService(obj.(*apiv1.Service))
       },
 
       UpdateFunc: func(_, obj interface{}) {
-        service := obj.(*apiv1.Service)
+        updateService(obj.(*apiv1.Service))
+      },
 
-        for _, value := range service.Spec.Ports {
-          if (servicesMap[ServiceKey{service.Name, value.Name}] != PortMap{value.NodePort, value.TargetPort.IntVal}) {
-
-            servicesMap[ServiceKey{service.Name, value.Name}] = PortMap{value.NodePort, value.TargetPort.IntVal}
-            fmt.Printf("Update service port: %s %d->%d\n", service.Name, value.NodePort, value.TargetPort.IntVal)
-
-            updated = true
-          }
-        }
+      DeleteFunc: func(obj interface{}) {
+        deleteService(obj.(*apiv1.Service))
       },
     },
   )
+
 
   stop := make(chan struct{})
 
