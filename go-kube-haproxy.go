@@ -125,10 +125,7 @@ func main() {
   for {
     time.Sleep(time.Second * 5)
 
-    if (tmpl.Updated) {
-      tmpl.Updated = false
-
-      tmpl.WriteHaproxyConfig(configTmpl)
+    if tmpl.WriteHaproxyConfig(configTmpl) {
       callHaproxyReload(*pidFile)
     }
   }
