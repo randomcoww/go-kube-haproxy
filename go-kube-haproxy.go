@@ -4,12 +4,10 @@ import (
   "fmt"
   "flag"
   "time"
-  "text/template"
-  "os"
   "strconv"
   "syscall"
-  "io/ioutil"
   "bytes"
+  "io/ioutil"
 
   apiv1 "k8s.io/api/core/v1"
   "k8s.io/client-go/kubernetes"
@@ -17,31 +15,6 @@ import (
   "k8s.io/client-go/tools/cache"
   "k8s.io/apimachinery/pkg/fields"
 )
-
-// service
-type ServiceKey struct {
-  ServiceName, PortName string
-}
-
-type PortMap struct {
-  NodePort, Port int32
-}
-
-
-// node
-type NodeKey struct {
-  NodeName string
-}
-
-type IPMap struct {
-  InternalIP string
-}
-
-// template
-type Template struct {
-  Services map[ServiceKey]PortMap
-  Nodes map[NodeKey]IPMap
-}
 
 
 var (
@@ -52,61 +25,23 @@ var (
 )
 
 
-// func haproxyCommand(cmd string, result *bytes.Buffer) {
-//   c, err := net.Dial("unix", *socketPath)
-//   defer c.Close()
-//
-//   if err != nil {
-//     panic(err.Error())
-//   }
-//
-//   _, err = c.Write([]byte(cmd + "\n"))
-//   if err != nil {
-//     panic(err.Error())
-//   }
-//
-//   io.Copy(result, c)
-// }
+// Do Haproxy (1.8) seamless reload with USR2 signal
+func callHaproxyReload(pidFile string) {
+  pid, err := ioutil.ReadFile(pidFile)
+
+  if err == nil {
+    pid, err := strconv.Atoi(string(bytes.TrimSpace(pid)))
+
+    if err == nil {
+      syscall.Kill(pid, syscall.SIGUSR2)
+      fmt.Println("Send kill", pid)
+    }
+  }
+}
 
 
 func main() {
   flag.Parse()
-
-  servicesMap := make(map[ServiceKey]PortMap)
-  nodesMap := make(map[NodeKey]IPMap)
-
-  tmpl := template.New("template")
-  updated := false
-
-
-  updateTemplate := func() {
-    f, _ := os.OpenFile(*outFile, os.O_CREATE|os.O_RDWR, 0644)
-    defer f.Close()
-    f.Truncate(0)
-
-    tmpl, _ = tmpl.ParseFiles(*templateFile)
-    fmt.Println("Update template", Template{ Services: servicesMap, Nodes: nodesMap })
-
-    err := tmpl.Execute(f, Template{ Services: servicesMap, Nodes: nodesMap })
-    if err != nil {
-      fmt.Println(err)
-    }
-  }
-
-
-  callReload := func() {
-    pid, err := ioutil.ReadFile(*pidFile)
-
-    if err == nil {
-      pid, err := strconv.Atoi(string(bytes.TrimSpace(pid)))
-
-      if err == nil {
-        syscall.Kill(pid, syscall.SIGUSR2)
-        fmt.Println("Send kill", pid)
-      }
-    }
-  }
-
 
   config, err := clientcmd.BuildConfigFromFlags("", *kubeconfigFile)
   if err != nil {
@@ -118,42 +53,15 @@ func main() {
     panic(err.Error())
   }
 
+  tmpl := &TemplateMap {
+    Services: make(map[ServiceKey]PortMap),
+    Nodes:    make(map[NodeKey]IPMap),
+    Updated:  false,
+  }
+
 
   nodeWatchlist := cache.NewListWatchFromClient(clientset.Core().RESTClient(),
     "nodes", apiv1.NamespaceAll, fields.Everything())
-
-  deleteNode := func(node *apiv1.Node) {
-    _, exists := nodesMap[NodeKey{node.Name}]
-
-    if exists {
-      delete(nodesMap, NodeKey{node.Name})
-      fmt.Printf("Delete node: %s\n", node.Name)
-      updated = true
-    }
-  }
-
-  updateNode := func(node *apiv1.Node) {
-    for _, condition := range node.Status.Conditions {
-      if (condition.Type == "Ready") {
-        if (condition.Status != apiv1.ConditionTrue) {
-
-          deleteNode(node)
-          return
-        }
-      }
-    }
-
-    for _, address := range node.Status.Addresses {
-      if (address.Type == "InternalIP") {
-        if (nodesMap[NodeKey{node.Name}] != IPMap{address.Address}) {
-
-          nodesMap[NodeKey{node.Name}] = IPMap{address.Address}
-          fmt.Printf("Update node: %s->%s\n", node.Name, address.Address)
-          updated = true
-        }
-      }
-    }
-  }
 
   _, nodeController := cache.NewInformer(
     nodeWatchlist,
@@ -162,47 +70,21 @@ func main() {
     cache.ResourceEventHandlerFuncs{
 
       AddFunc: func(obj interface{}) {
-        updateNode(obj.(*apiv1.Node))
+        tmpl.UpdateNode(obj.(*apiv1.Node))
       },
 
       UpdateFunc: func(_, obj interface{}) {
-        updateNode(obj.(*apiv1.Node))
+        tmpl.UpdateNode(obj.(*apiv1.Node))
       },
 
       DeleteFunc: func(obj interface{}) {
-        deleteNode(obj.(*apiv1.Node))
+        tmpl.DeleteNode(obj.(*apiv1.Node))
       },
     },
   )
 
-
   serviceWatchlist := cache.NewListWatchFromClient(clientset.Core().RESTClient(),
     "services", apiv1.NamespaceDefault, fields.Everything())
-
-  deleteService := func(service *apiv1.Service) {
-    for _, value := range service.Spec.Ports {
-      _, exists := servicesMap[ServiceKey{service.Name, value.Name}]
-
-      if exists {
-        delete(servicesMap, ServiceKey{service.Name, value.Name})
-        fmt.Printf("Delete service: %s\n", service.Name)
-        updated = true
-      }
-    }
-  }
-
-  updateService := func(service *apiv1.Service) {
-    for _, value := range service.Spec.Ports {
-      if value.Protocol == "TCP" {
-        if (servicesMap[ServiceKey{service.Name, value.Name}] != PortMap{value.NodePort, value.TargetPort.IntVal}) {
-
-          servicesMap[ServiceKey{service.Name, value.Name}] = PortMap{value.NodePort, value.TargetPort.IntVal}
-          fmt.Printf("Update service port: %s %d->%d\n", service.Name, value.NodePort, value.TargetPort.IntVal)
-          updated = true
-        }
-      }
-    }
-  }
 
   _, serviceController := cache.NewInformer(
     serviceWatchlist,
@@ -211,15 +93,15 @@ func main() {
     cache.ResourceEventHandlerFuncs{
 
       AddFunc: func(obj interface{}) {
-        updateService(obj.(*apiv1.Service))
+        tmpl.UpdateService(obj.(*apiv1.Service))
       },
 
       UpdateFunc: func(_, obj interface{}) {
-        updateService(obj.(*apiv1.Service))
+        tmpl.UpdateService(obj.(*apiv1.Service))
       },
 
       DeleteFunc: func(obj interface{}) {
-        deleteService(obj.(*apiv1.Service))
+        tmpl.DeleteService(obj.(*apiv1.Service))
       },
     },
   )
@@ -233,11 +115,11 @@ func main() {
   for {
     time.Sleep(time.Second * 5)
 
-    if (updated) {
-      updated = false
+    if (tmpl.Updated) {
+      tmpl.Updated = false
 
-      updateTemplate()
-      callReload()
+      tmpl.WriteHaproxyConfig(*templateFile)
+      callHaproxyReload(*pidFile)
     }
   }
 }
