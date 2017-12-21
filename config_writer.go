@@ -4,23 +4,15 @@ import (
   "fmt"
   "os"
   "text/template"
-  "path/filepath"
 )
 
 // Write Template to haproxy config
-func (tmpl *TemplateMap) WriteHaproxyConfig(templateFile string) {
+func (tmpl *TemplateMap) WriteHaproxyConfig(configTmpl *template.Template) {
   f, _ := os.OpenFile(*outFile, os.O_CREATE|os.O_RDWR, 0644)
   defer f.Close()
   f.Truncate(0)
 
-  _, file := filepath.Split(templateFile)
-
-  t, err := template.New(file).ParseFiles(templateFile)
-  if err != nil {
-    fmt.Println(err)
-  }
-
-  err = t.Execute(f, tmpl)
+  err := configTmpl.Execute(f, tmpl)
   if err != nil {
     fmt.Println(err)
 

@@ -8,6 +8,8 @@ import (
   "syscall"
   "bytes"
   "io/ioutil"
+  "text/template"
+  "path/filepath"
 
   apiv1 "k8s.io/api/core/v1"
   "k8s.io/client-go/kubernetes"
@@ -53,6 +55,14 @@ func main() {
     panic(err.Error())
   }
 
+  // go template for haproxy
+  _, fileName := filepath.Split(*templateFile)
+  configTmpl, err := template.New(fileName).ParseFiles(*templateFile)
+  if err != nil {
+    panic(err.Error())
+  }
+
+  // template map from service
   tmpl := &TemplateMap {
     Services: make(map[ServiceKey]PortMap),
     Nodes:    make(map[NodeKey]IPMap),
@@ -118,7 +128,7 @@ func main() {
     if (tmpl.Updated) {
       tmpl.Updated = false
 
-      tmpl.WriteHaproxyConfig(*templateFile)
+      tmpl.WriteHaproxyConfig(configTmpl)
       callHaproxyReload(*pidFile)
     }
   }
