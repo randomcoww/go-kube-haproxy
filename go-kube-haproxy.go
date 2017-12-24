@@ -80,11 +80,13 @@ func main() {
     cache.ResourceEventHandlerFuncs{
 
       AddFunc: func(obj interface{}) {
-        tmpl.UpdateNode(obj.(*apiv1.Node))
+        tmpl.UpdateAddresses(obj.(*apiv1.Node))
+        tmpl.NodeAnnotations(obj.(*apiv1.Node))
       },
 
       UpdateFunc: func(_, obj interface{}) {
-        tmpl.UpdateNode(obj.(*apiv1.Node))
+        tmpl.UpdateAddresses(obj.(*apiv1.Node))
+        tmpl.NodeAnnotations(obj.(*apiv1.Node))
       },
 
       DeleteFunc: func(obj interface{}) {
@@ -103,11 +105,13 @@ func main() {
     cache.ResourceEventHandlerFuncs{
 
       AddFunc: func(obj interface{}) {
-        tmpl.UpdateService(obj.(*apiv1.Service))
+        tmpl.UpdatePorts(obj.(*apiv1.Service))
+        tmpl.ServiceAnnotations(obj.(*apiv1.Service))
       },
 
       UpdateFunc: func(_, obj interface{}) {
-        tmpl.UpdateService(obj.(*apiv1.Service))
+        tmpl.UpdatePorts(obj.(*apiv1.Service))
+        tmpl.ServiceAnnotations(obj.(*apiv1.Service))
       },
 
       DeleteFunc: func(obj interface{}) {

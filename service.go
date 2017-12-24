@@ -2,17 +2,25 @@ package main
 
 import (
   "fmt"
+  "strings"
   apiv1 "k8s.io/api/core/v1"
 )
 
 
-func (tmpl *TemplateMap) UpdateService(service *apiv1.Service) {
-  m, exists := tmpl.Services[service.Name]
+func (t *TemplateMap) serviceMap(service *apiv1.Service) (*ServiceMap, bool) {
+  m, exists := t.Services[service.Name]
 
   if !exists {
     m = &ServiceMap{}
-    tmpl.Services[service.Name] = m
+    t.Services[service.Name] = m
   }
+
+  return m, !exists
+}
+
+// service ports
+func (t *TemplateMap) UpdatePorts(service *apiv1.Service) {
+  m, new := t.serviceMap(service)
 
   newPorts := make(map[string]PortMap)
   updated := false
@@ -28,7 +36,7 @@ func (tmpl *TemplateMap) UpdateService(service *apiv1.Service) {
         TargetPort: port.TargetPort.IntVal,
       }
 
-      if exists && m.Ports[k] != v {
+      if !new && m.Ports[k] != v {
         updated = true
       }
 
@@ -36,22 +44,54 @@ func (tmpl *TemplateMap) UpdateService(service *apiv1.Service) {
     }
   }
 
-  if !exists || updated || len(newPorts) != len(m.Ports) {
+  if new || updated || len(newPorts) != len(m.Ports) {
     m.Ports = newPorts
 
-    fmt.Printf("Update service: %s\n", service.Name)
-    tmpl.Updated = true
+    fmt.Printf("Update service ports: %s\n", service.Name)
+    t.Updated = true
+  }
+}
+
+// service annotations
+func (t *TemplateMap) ServiceAnnotations(service *apiv1.Service) {
+  m, new := t.serviceMap(service)
+
+  newAnnotations := make(map[string]string)
+  updated := false
+
+  for k, v := range service.Annotations {
+
+    if strings.HasPrefix(k, "kube_haproxy.") {
+      k = strings.TrimLeft(k, "kube_haproxy.")
+
+      if k == "" {
+        continue
+      }
+
+      if !new && m.Annotations[k] != v {
+        updated = true
+      }
+
+      newAnnotations[k] = v
+    }
+  }
+
+  if new || updated || len(newAnnotations) != len(m.Annotations) {
+    m.Annotations = newAnnotations
+
+    fmt.Printf("Update service annotations: %s\n", service.Name)
+    t.Updated = true
   }
 }
 
 
-func (tmpl *TemplateMap) DeleteService(service *apiv1.Service) {
-  _, exists := tmpl.Services[service.Name]
+func (t *TemplateMap) DeleteService(service *apiv1.Service) {
+  _, exists := t.Services[service.Name]
 
   if exists {
-    delete(tmpl.Services, service.Name)
+    delete(t.Services, service.Name)
 
     fmt.Printf("Delete service: %s\n", service.Name)
-    tmpl.Updated = true
+    t.Updated = true
   }
 }

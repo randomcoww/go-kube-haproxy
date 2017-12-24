@@ -25,11 +25,17 @@ func (tmpl *TemplateMap) WriteHaproxyConfig(configTmpl *template.Template) bool 
 
       for k, v := range tmpl.Nodes {
         fmt.Printf("config node addresses: %s -> %s\n", k, v.Address)
+        for n, p := range v.Annotations {
+          fmt.Printf("config node annotations: %s %s -> %s\n", k, n, p)
+        }
       }
 
       for k, v := range tmpl.Services {
         for n, p := range v.Ports {
           fmt.Printf("config service ports: %s %s -> %d\n", k, n, p)
+        }
+        for n, p := range v.Annotations {
+          fmt.Printf("config service annotations: %s %s -> %s\n", k, n, p)
         }
       }
 
