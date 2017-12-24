@@ -14,36 +14,44 @@ func (tmpl *TemplateMap) UpdateNode(node *apiv1.Node) {
 
       if (condition.Status != apiv1.ConditionTrue) {
         tmpl.DeleteNode(node)
+
         return
       }
     }
   }
 
-  for _, address := range node.Status.Addresses {
+  m, exists := tmpl.Nodes[node.Name]
 
-    k := NodeKey{node.Name}
-    v := IPMap{address.Address}
+  if !exists {
+    m = &NodeMap{}
+    tmpl.Nodes[node.Name] = m
+  }
+
+  for _, address := range node.Status.Addresses {
 
     switch address.Type {
     case "InternalIP":
 
-      if (tmpl.Nodes[k] != v) {
-        tmpl.Nodes[k] = v
+      v := address.Address
 
-        fmt.Printf("Update node: %s->%s\n", node.Name, address.Address)
+      if m.Address != v {
+        m.Address = v
+
+        fmt.Printf("Update node: %s\n", node.Name)
         tmpl.Updated = true
       }
+
+      return
     }
   }
 }
 
 
 func (tmpl *TemplateMap) DeleteNode(node *apiv1.Node) {
-  k := NodeKey{node.Name}
+  _, exists := tmpl.Nodes[node.Name]
 
-  _, exists := tmpl.Nodes[k]
   if exists {
-    delete(tmpl.Nodes, k)
+    delete(tmpl.Nodes, node.Name)
 
     fmt.Printf("Delete node: %s\n", node.Name)
     tmpl.Updated = true

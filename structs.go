@@ -1,27 +1,23 @@
 package main
 
-type ServiceKey struct {
-  ServiceName string
-  PortName    string
+type TemplateMap struct {
+  Services  map[string](*ServiceMap)
+  Nodes     map[string](*NodeMap)
+  Updated   bool
+}
+
+
+type ServiceMap struct {
+  Ports       map[string]PortMap
+  Annotations map[string]string
+}
+
+type NodeMap struct {
+  Address     string
+  Annotations map[string]string
 }
 
 type PortMap struct {
-  NodePort  int32
-  Port      int32
-}
-
-
-type NodeKey struct {
-  NodeName  string
-}
-
-type IPMap struct {
-  InternalIP string
-}
-
-
-type TemplateMap struct {
-  Services  map[ServiceKey]PortMap
-  Nodes     map[NodeKey]IPMap
-  Updated   bool
+  NodePort    int32
+  TargetPort  int32
 }

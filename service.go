@@ -7,36 +7,51 @@ import (
 
 
 func (tmpl *TemplateMap) UpdateService(service *apiv1.Service) {
-  for _, value := range service.Spec.Ports {
+  m, exists := tmpl.Services[service.Name]
 
-    switch value.Protocol {
+  if !exists {
+    m = &ServiceMap{}
+    tmpl.Services[service.Name] = m
+  }
+
+  newPorts := make(map[string]PortMap)
+  updated := false
+
+  for _, port := range service.Spec.Ports {
+
+    switch port.Protocol {
     case "TCP":
 
-      k := ServiceKey{service.Name, value.Name}
-      v := PortMap{value.NodePort, value.TargetPort.IntVal}
-
-      if (tmpl.Services[k] != v) {
-        tmpl.Services[k] = v
-
-        fmt.Printf("Update service port: %s %d->%d\n", service.Name, value.NodePort, value.TargetPort.IntVal)
-        tmpl.Updated = true
+      k := port.Name
+      v := PortMap{
+        NodePort:   port.NodePort,
+        TargetPort: port.TargetPort.IntVal,
       }
+
+      if exists && m.Ports[k] != v {
+        updated = true
+      }
+
+      newPorts[k] = v
     }
+  }
+
+  if !exists || updated || len(newPorts) != len(m.Ports) {
+    m.Ports = newPorts
+
+    fmt.Printf("Update service: %s\n", service.Name)
+    tmpl.Updated = true
   }
 }
 
 
 func (tmpl *TemplateMap) DeleteService(service *apiv1.Service) {
-  for _, value := range service.Spec.Ports {
+  _, exists := tmpl.Services[service.Name]
 
-    k := ServiceKey{service.Name, value.Name}
+  if exists {
+    delete(tmpl.Services, service.Name)
 
-    _, exists := tmpl.Services[k]
-    if exists {
-      delete(tmpl.Services, k)
-
-      fmt.Printf("Delete service: %s\n", service.Name)
-      tmpl.Updated = true
-    }
+    fmt.Printf("Delete service: %s\n", service.Name)
+    tmpl.Updated = true
   }
 }

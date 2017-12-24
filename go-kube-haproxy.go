@@ -64,8 +64,8 @@ func main() {
 
   // template map from service
   tmpl := &TemplateMap {
-    Services: make(map[ServiceKey]PortMap),
-    Nodes:    make(map[NodeKey]IPMap),
+    Services: make(map[string](*ServiceMap)),
+    Nodes:    make(map[string](*NodeMap)),
     Updated:  false,
   }
 
