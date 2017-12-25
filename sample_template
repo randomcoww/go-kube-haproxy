@@ -19,18 +19,16 @@ defaults
   balance roundrobin
   option dontlognull
   option redispatch
-{{range $service, $ports := $.Services}}{{if $ports.NodePort}}frontend {{$service.ServiceName}}_{{$service.PortName}}
-  default_backend {{$service.ServiceName}}_{{$service.PortName}}
-  bind *:{{$ports.Port}}
+
+frontend http-in
+  bind 0.0.0.0:80
+  {{range $name, $s := $.Services}}{{range $k, $annotation := $s.Annotations}}use_backend {{$name}}_{{$k}} if {{$annotation}}{{end}}{{end}}
+
+{{range $name, $s := $.Services}}{{range $portname, $p := $s.Ports}}frontend {{$name}}_{{$portname}}
+  default_backend {{$name}}_{{$portname}}
+  bind *:{{$p.TargetPort}}
   maxconn 2000
-backend {{$service.ServiceName}}_{{$service.PortName}}
-  {{range $node, $host := $.Nodes}}server {{$node.NodeName}} {{$host.InternalIP}}:{{$ports.NodePort}}
-  {{end}}
-{{else}}frontend {{$service.ServiceName}}_{{$service.PortName}}
-  default_backend {{$service.ServiceName}}_{{$service.PortName}}
-  bind *:{{$ports.Port}}
-  maxconn 2000
-backend {{$service.ServiceName}}_{{$service.PortName}}
-  {{range $node, $host := $.Nodes}}server {{$node.NodeName}} {{$host.InternalIP}}:{{$ports.Port}}
+backend {{$name}}_{{$portname}}
+  {{range $nodename, $n := $.Nodes}}server {{$nodename}} {{$n.Address}}:{{$p.NodePort}}
   {{end}}
 {{end}}{{end}}
