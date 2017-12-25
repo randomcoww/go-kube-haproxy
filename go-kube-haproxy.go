@@ -24,6 +24,7 @@ var (
   templateFile = flag.String("template", "", "go template file path")
   outFile = flag.String("output", "", "output file path")
   pidFile = flag.String("pid", "", "pid file path")
+  annotationPrefix = flag.String("prefix", "kube-haproxy.", "annotation prefix")
 )
 
 

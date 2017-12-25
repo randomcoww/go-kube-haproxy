@@ -36,8 +36,8 @@ func (t *TemplateMap) UpdateAnnotations(a map[string]string, m Annotations, isNe
 
   for k, v := range a {
 
-    if strings.HasPrefix(k, "kube_haproxy.") {
-      k = strings.TrimLeft(k, "kube_haproxy.")
+    if strings.HasPrefix(k, *annotationPrefix) {
+      k = strings.TrimLeft(k, *annotationPrefix)
 
       if k == "" {
         continue

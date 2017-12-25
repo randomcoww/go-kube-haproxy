@@ -18,13 +18,14 @@ defaults
 
 frontend http-in
   bind 0.0.0.0:80
-  {{range $name, $s := $.Services}}{{range $k, $annotation := $s.Annotations}}use_backend {{$name}}_{{$k}} if {{$annotation}}{{end}}{{end}}
-
+  {{range $name, $s := $.Services}}{{range $k, $annotation := $s.Annotations}}acl acl_{{$name}}_{{$k}} {{$annotation}}
+  use_backend {{$name}}_{{$k}} if acl_{{$name}}_{{$k}}
+  {{end}}{{end}}
 {{range $name, $s := $.Services}}{{range $portname, $p := $s.Ports}}frontend {{$name}}_{{$portname}}
   default_backend {{$name}}_{{$portname}}
   bind *:{{$p.TargetPort}}
   maxconn 2000
 backend {{$name}}_{{$portname}}
-  {{range $nodename, $n := $.Nodes}}server {{$nodename}} {{$n.Address}}:{{$p.NodePort}}
+  {{range $nodename, $n := $.Nodes}}server {{$nodename}} {{$n.Address}}:{{$p.NodePort}} check
   {{end}}
 {{end}}{{end}}
