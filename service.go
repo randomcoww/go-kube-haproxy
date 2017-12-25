@@ -2,7 +2,6 @@ package main
 
 import (
   "fmt"
-  // "strings"
   apiv1 "k8s.io/api/core/v1"
 )
 
@@ -26,6 +25,10 @@ func (t *TemplateMap) UpdatePorts(service *apiv1.Service) {
   updated := false
 
   for _, port := range service.Spec.Ports {
+
+    if port.NodePort == 0 {
+      continue
+    }
 
     switch port.Protocol {
     case "TCP":
