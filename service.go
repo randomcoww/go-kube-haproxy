@@ -2,7 +2,7 @@ package main
 
 import (
   "fmt"
-  "strings"
+  // "strings"
   apiv1 "k8s.io/api/core/v1"
 )
 
@@ -54,34 +54,9 @@ func (t *TemplateMap) UpdatePorts(service *apiv1.Service) {
 
 // service annotations
 func (t *TemplateMap) ServiceAnnotations(service *apiv1.Service) {
-  m, new := t.serviceMap(service)
+  m, isNew := t.serviceMap(service)
 
-  newAnnotations := make(map[string]string)
-  updated := false
-
-  for k, v := range service.Annotations {
-
-    if strings.HasPrefix(k, "kube_haproxy.") {
-      k = strings.TrimLeft(k, "kube_haproxy.")
-
-      if k == "" {
-        continue
-      }
-
-      if !new && m.Annotations[k] != v {
-        updated = true
-      }
-
-      newAnnotations[k] = v
-    }
-  }
-
-  if new || updated || len(newAnnotations) != len(m.Annotations) {
-    m.Annotations = newAnnotations
-
-    fmt.Printf("Update service annotations: %s\n", service.Name)
-    t.Updated = true
-  }
+  t.UpdateAnnotations(service.Annotations, m, isNew)
 }
 
 

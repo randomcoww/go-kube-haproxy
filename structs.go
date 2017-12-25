@@ -1,5 +1,8 @@
 package main
 
+import (
+)
+
 type TemplateMap struct {
   Services  map[string](*ServiceMap)
   Nodes     map[string](*NodeMap)

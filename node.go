@@ -2,7 +2,6 @@ package main
 
 import (
   "fmt"
-  "strings"
   apiv1 "k8s.io/api/core/v1"
 )
 
@@ -54,36 +53,11 @@ func (t *TemplateMap) UpdateAddresses(node *apiv1.Node) {
   }
 }
 
-// service annotations
+// node annotations
 func (t *TemplateMap) NodeAnnotations(node *apiv1.Node) {
-  m, new := t.nodeMap(node)
+  m, isNew := t.nodeMap(node)
 
-  newAnnotations := make(map[string]string)
-  updated := false
-
-  for k, v := range node.Annotations {
-
-    if strings.HasPrefix(k, "kube_haproxy.") {
-      k = strings.TrimLeft(k, "kube_haproxy.")
-
-      if k == "" {
-        continue
-      }
-
-      if !new && m.Annotations[k] != v {
-        updated = true
-      }
-
-      newAnnotations[k] = v
-    }
-  }
-
-  if new || updated || len(newAnnotations) != len(m.Annotations) {
-    m.Annotations = newAnnotations
-
-    fmt.Printf("Update node annotations: %s\n", node.Name)
-    t.Updated = true
-  }
+  t.UpdateAnnotations(node.Annotations, m, isNew)
 }
 
 
