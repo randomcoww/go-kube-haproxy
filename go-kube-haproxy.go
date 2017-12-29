@@ -43,6 +43,14 @@ func callHaproxyReload(pidFile string) {
 }
 
 
+func (t *TemplateMap) setUpdated() {
+  select {
+  case t.updated <- struct{}{}:
+  default:
+  }
+}
+
+
 func main() {
   flag.Parse()
 

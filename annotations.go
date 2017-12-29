@@ -53,8 +53,6 @@ func (t *TemplateMap) UpdateAnnotations(a map[string]string, m Annotations, isNe
 
   if isNew || updated || len(newAnnotations) != len(m.GetAnnotations()) {
     m.SetAnnotations(newAnnotations)
-
-    // fmt.Printf("Update service annotations: %s\n", service.Name)
-    t.Updated = true
+    t.setUpdated()
   }
 }
