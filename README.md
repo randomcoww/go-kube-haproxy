@@ -1,4 +1,4 @@
-### Haproxy side car for Kubernetes node port load balancing
+## Haproxy side car for Kubernetes node port load balancing
 
 A mapping of service target ports and node ports are collected for use in building Haproxy configuration from a supplied Go template.
 
