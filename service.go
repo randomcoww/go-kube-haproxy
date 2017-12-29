@@ -51,7 +51,7 @@ func (t *TemplateMap) UpdatePorts(service *apiv1.Service) {
     m.Ports = newPorts
 
     fmt.Printf("Update service ports: %s\n", service.Name)
-    t.Updated = true
+    t.setUpdated()
   }
 }
 
@@ -70,6 +70,6 @@ func (t *TemplateMap) DeleteService(service *apiv1.Service) {
     delete(t.Services, service.Name)
 
     fmt.Printf("Delete service: %s\n", service.Name)
-    t.Updated = true
+    t.setUpdated()
   }
 }

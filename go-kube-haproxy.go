@@ -20,11 +20,11 @@ import (
 
 
 var (
-  kubeconfigFile = flag.String("kubeconfig", "", "kubeconfig file path")
-  templateFile = flag.String("template", "", "go template file path")
-  outFile = flag.String("output", "", "output file path")
-  pidFile = flag.String("pid", "", "pid file path")
-  annotationPrefix = flag.String("prefix", "kube-haproxy.", "annotation prefix")
+  kubeconfigFile = flag.String("kubeconfig", "", "Kubeconfig file path")
+  templateFile = flag.String("template", "", "Haproxy Go template file path")
+  outFile = flag.String("output", "", "Output file path")
+  pidFile = flag.String("pid", "", "PID file path")
+  annotationPrefix = flag.String("prefix", "kube-haproxy.", "Annotation prefix")
 )
 
 
@@ -64,10 +64,10 @@ func main() {
   }
 
   // template map from service
-  tmpl := &TemplateMap {
+  t := &TemplateMap {
     Services: make(map[string](*ServiceMap)),
     Nodes:    make(map[string](*NodeMap)),
-    Updated:  false,
+    updated:  make(chan struct{}, 1),
   }
 
 
@@ -81,17 +81,23 @@ func main() {
     cache.ResourceEventHandlerFuncs{
 
       AddFunc: func(obj interface{}) {
-        tmpl.UpdateAddresses(obj.(*apiv1.Node))
-        tmpl.NodeAnnotations(obj.(*apiv1.Node))
+        t.mux.Lock()
+        t.UpdateAddresses(obj.(*apiv1.Node))
+        t.NodeAnnotations(obj.(*apiv1.Node))
+        t.mux.Unlock()
       },
 
       UpdateFunc: func(_, obj interface{}) {
-        tmpl.UpdateAddresses(obj.(*apiv1.Node))
-        tmpl.NodeAnnotations(obj.(*apiv1.Node))
+        t.mux.Lock()
+        t.UpdateAddresses(obj.(*apiv1.Node))
+        t.NodeAnnotations(obj.(*apiv1.Node))
+        t.mux.Unlock()
       },
 
       DeleteFunc: func(obj interface{}) {
-        tmpl.DeleteNode(obj.(*apiv1.Node))
+        t.mux.Lock()
+        t.DeleteNode(obj.(*apiv1.Node))
+        t.mux.Unlock()
       },
     },
   )
@@ -106,17 +112,23 @@ func main() {
     cache.ResourceEventHandlerFuncs{
 
       AddFunc: func(obj interface{}) {
-        tmpl.UpdatePorts(obj.(*apiv1.Service))
-        tmpl.ServiceAnnotations(obj.(*apiv1.Service))
+        t.mux.Lock()
+        t.UpdatePorts(obj.(*apiv1.Service))
+        t.ServiceAnnotations(obj.(*apiv1.Service))
+        t.mux.Unlock()
       },
 
       UpdateFunc: func(_, obj interface{}) {
-        tmpl.UpdatePorts(obj.(*apiv1.Service))
-        tmpl.ServiceAnnotations(obj.(*apiv1.Service))
+        t.mux.Lock()
+        t.UpdatePorts(obj.(*apiv1.Service))
+        t.ServiceAnnotations(obj.(*apiv1.Service))
+        t.mux.Unlock()
       },
 
       DeleteFunc: func(obj interface{}) {
-        tmpl.DeleteService(obj.(*apiv1.Service))
+        t.mux.Lock()
+        t.DeleteService(obj.(*apiv1.Service))
+        t.mux.Unlock()
       },
     },
   )
@@ -128,10 +140,23 @@ func main() {
   go serviceController.Run(stop)
 
   for {
+    // don't reload config more than once per 5 sec
     time.Sleep(time.Second * 5)
 
-    if tmpl.WriteHaproxyConfig(configTmpl) {
-      callHaproxyReload(*pidFile)
+    select {
+    case <- t.updated:
+      t.mux.Lock()
+      // defer t.mux.Unlock()
+      err := t.WriteHaproxyConfig(configTmpl)
+
+      if err != nil {
+        fmt.Println(err)
+      } else {
+        callHaproxyReload(*pidFile)
+      }
+      t.mux.Unlock()
+
+    default:
     }
   }
 }

@@ -13,51 +13,46 @@ var (
 )
 
 // Write Template to haproxy config
-func (tmpl *TemplateMap) WriteHaproxyConfig(configTmpl *template.Template) bool {
-  if (tmpl.Updated) {
-    tmpl.Updated = false
+func (t *TemplateMap) WriteHaproxyConfig(configTmpl *template.Template) error {
 
-    err := configTmpl.Execute(io.Writer(&templateBuffer), tmpl)
+  err := configTmpl.Execute(io.Writer(&templateBuffer), t)
+  if err != nil {
+    return err
+
+  } else {
+
+    for k, v := range t.Nodes {
+      fmt.Printf("config node addresses: %s -> %s\n", k, v.Address)
+      for n, p := range v.Annotations {
+        fmt.Printf("config node annotations: %s %s -> %s\n", k, n, p)
+      }
+    }
+
+    for k, v := range t.Services {
+      for n, p := range v.Ports {
+        fmt.Printf("config service ports: %s %s -> %d\n", k, n, p)
+      }
+      for n, p := range v.Annotations {
+        fmt.Printf("config service annotations: %s %s -> %s\n", k, n, p)
+      }
+    }
+
+    f, err := os.OpenFile(*outFile, os.O_CREATE|os.O_RDWR, 0644)
+    defer f.Close()
+
     if err != nil {
-      fmt.Println(err)
+      return err
 
     } else {
-
-      for k, v := range tmpl.Nodes {
-        fmt.Printf("config node addresses: %s -> %s\n", k, v.Address)
-        for n, p := range v.Annotations {
-          fmt.Printf("config node annotations: %s %s -> %s\n", k, n, p)
-        }
-      }
-
-      for k, v := range tmpl.Services {
-        for n, p := range v.Ports {
-          fmt.Printf("config service ports: %s %s -> %d\n", k, n, p)
-        }
-        for n, p := range v.Annotations {
-          fmt.Printf("config service annotations: %s %s -> %s\n", k, n, p)
-        }
-      }
-
-      f, err := os.OpenFile(*outFile, os.O_CREATE|os.O_RDWR, 0644)
-      defer f.Close()
+      written, err := templateBuffer.WriteTo(f)
+      f.Truncate(written)
 
       if err != nil {
-        fmt.Println(err)
+        return err
 
       } else {
-        written, err := templateBuffer.WriteTo(f)
-        f.Truncate(written)
-
-        if err != nil {
-          fmt.Println(err)
-
-        } else {
-          return true
-        }
+        return nil
       }
     }
   }
-
-  return false
 }

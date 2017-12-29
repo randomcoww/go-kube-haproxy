@@ -45,7 +45,7 @@ func (t *TemplateMap) UpdateAddresses(node *apiv1.Node) {
         m.Address = v
 
         fmt.Printf("Update node addresses: %s\n", node.Name)
-        t.Updated = true
+        t.setUpdated()
       }
 
       return
@@ -68,6 +68,6 @@ func (t *TemplateMap) DeleteNode(node *apiv1.Node) {
     delete(t.Nodes, node.Name)
 
     fmt.Printf("Delete node: %s\n", node.Name)
-    t.Updated = true
+    t.setUpdated()
   }
 }

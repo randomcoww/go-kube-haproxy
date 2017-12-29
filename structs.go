@@ -1,12 +1,15 @@
 package main
 
 import (
+  "sync"
 )
 
 type TemplateMap struct {
   Services  map[string](*ServiceMap)
   Nodes     map[string](*NodeMap)
   Updated   bool
+  mux       sync.Mutex
+  updated   chan struct{}
 }
 
 
@@ -23,4 +26,12 @@ type NodeMap struct {
 type PortMap struct {
   NodePort    int32
   TargetPort  int32
+}
+
+
+func (t *TemplateMap) setUpdated() {
+  select {
+  case t.updated <- struct{}{}:
+  default:
+  }
 }
