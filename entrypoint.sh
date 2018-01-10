@@ -2,5 +2,5 @@
 echo -en "$CONFIG" > /template
 
 ## start
-exec /go-kube-haproxy "$@" \
+exec /goapp "$@" \
   -template /template

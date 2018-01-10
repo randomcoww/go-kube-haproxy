@@ -1,5 +1,16 @@
+FROM golang:alpine as BUILD
+
+WORKDIR /go/src/goapp/
+COPY . .
+
+RUN set -x \
+	&& apk add --no-cache git \
+	&& go get -d ./... \
+	&& go build
+
 FROM alpine:latest
 
-COPY go-kube-haproxy /
+COPY --from=BUILD /go/src/goapp/goapp /
 COPY entrypoint.sh /
-ENTRYPOINT ["/entrypoint.sh"]
+
+ENTRYPOINT ["/entrypoint.sh"] 
