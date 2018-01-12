@@ -4,13 +4,16 @@ WORKDIR /go/src/goapp/
 COPY . .
 
 RUN set -x \
-	&& apk add --no-cache git \
-	&& go get -d ./... \
-	&& go build
+  \
+  && apk add --no-cache \
+    git \
+  \
+  && go get -d ./... \
+  && go build
 
 FROM alpine:latest
 
 COPY --from=BUILD /go/src/goapp/goapp /
-COPY entrypoint.sh /
 
-ENTRYPOINT ["/entrypoint.sh"] 
+COPY entrypoint.sh /
+ENTRYPOINT ["/entrypoint.sh"]
